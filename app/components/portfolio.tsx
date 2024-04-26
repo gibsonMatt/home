@@ -18,9 +18,7 @@ export function PortfolioItems() {
               <p className="text-sm text-slate-800 dark:text-neutral-100">
                 {item.description}
               </p>
-
             </div>
-
           </div>
         );
       })}
