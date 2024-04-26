@@ -9,7 +9,7 @@ export function Resources() {
           return (
             <div className="flex-row md:flex-row pb-2">
               <a href={item.link}>
-                <li className="text-neutral-900 dark:text-neutral-100 tracking-tight hover:text-blue-600">
+                <li className="text-neutral-900 dark:text-neutral-100 tracking-tight hover:text-sky-400">
                   {item.name}
                 </li>
               </a>

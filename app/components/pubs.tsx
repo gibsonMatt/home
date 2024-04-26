@@ -62,13 +62,13 @@ export async function Publications() {
         return (
           <div>
             {!entry.url && (
-              <div className="pb-4 hover:text-blue-600">
+              <div className="pb-4 hover:text-sky-400">
                 {entry.author}. <span className="font-bold">{entry.year}</span>.{" "}
                 {entry.title}. <span className="italic">{entry.journal}</span>
               </div>
             )}
             {entry.url && (
-              <div className="pb-4 hover:text-blue-600">
+              <div className="pb-4 hover:text-sky-400">
                 <a href={entry.url}>
                   {entry.author}.{" "}
                   <span className="font-bold">{entry.year}</span>. {entry.title}
