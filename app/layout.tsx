@@ -6,10 +6,9 @@ import { Navbar } from "./components/nav";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import Footer from "./components/footer";
-import { baseUrl } from "./sitemap";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(baseUrl),
+  metadataBase: new URL("https://home.gibsonmatthew.com"),
   title: {
     default: "Matt Gibson",
     template: "",
@@ -18,7 +17,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Matt Gibson",
     description: "Matt Gibson",
-    url: baseUrl,
+    url: "https://home.gibsonmatthew.com",
     siteName: "Matt Gibson",
     locale: "en_US",
     type: "website",
