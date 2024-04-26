@@ -1,4 +1,3 @@
-import { BlogPosts } from "app/components/posts";
 import { NewsItems } from "app/components/news";
 
 export default function Page() {
