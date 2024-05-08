@@ -33,4 +33,9 @@ export const portfolio_data: PortfolioItem[] = [
     link: "https://gibsonmatt.shinyapps.io/prettymap/",
     description: "R Shiny app for making publication quality maps",
   },
+  {
+    name: "bioneer",
+    link: "https://github.com/gibsonMatt/bioneer",
+    description: "LLM tool for getting the right bcftools commands",
+  },
 ];
