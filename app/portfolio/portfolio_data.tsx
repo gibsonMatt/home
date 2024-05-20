@@ -38,4 +38,9 @@ export const portfolio_data: PortfolioItem[] = [
     link: "https://github.com/gibsonMatt/bioneer",
     description: "LLM tool for getting the right bcftools commands",
   },
+  {
+    name: "home-dashboard",
+    link: "https://github.com/gibsonMatt/home-dashboard",
+    description: "Next.js server dashboard app for my home media server",
+  },
 ];
