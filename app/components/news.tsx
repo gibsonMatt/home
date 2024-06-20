@@ -10,10 +10,13 @@ export function NewsItems() {
   });
 
   function compare(a: NewsStory, b: NewsStory) {
-    if (a.date < b.date) {
+    let a_date = new Date(a.date).getTime()
+    let b_date = new Date(b.date).getTime()
+
+    if (a_date > b_date) {
       return -1;
     }
-    if (a.date > b.date) {
+    if (a_date < b_date) {
       return 1;
     }
     return 0;

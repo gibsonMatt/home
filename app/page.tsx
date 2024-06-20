@@ -19,15 +19,14 @@ export default function Page() {
 
         <div className="flex-1">
           <p className="mb-4">
-            {`My name is Matt Gibson. I am a senior data scientist/statistical geneticist 
-        in biotech (currently at Gencove). I have a PhD in Evolutionary Genetics and Bioinformatics 
-        from Indiana University, where I worked with Leonie Moyle. `}
+            My name is Matt Gibson. Currently I work as a bioinformatics engineer at <a className="hover:text-blue-600" href="https://lilly.com">Eli Lilly and Company</a>. I have a PhD in Evolutionary Genetics and Bioinformatics 
+        from Indiana University, where I worked with <a className="hover:text-blue-600" href="https://moylelab.sitehost.iu.edu/">Leonie Moyle.</a>
           </p>
-          {`I am interested in evolution, population genetics, 
+          I am interested in evolution, population genetics, 
         and developing computational solutions to complex biological 
         problems. I have published on many topics, including landscape genetics, 
         population genomics of invasive species, phylogenetic inference, molecular evolution, 
-        imputation, and low pass sequencing.`}
+        imputation, and low pass sequencing.
         </div>
         <div className="my-8 block">
           <NewsItems />
