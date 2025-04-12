@@ -1,10 +1,11 @@
 import { NewsItems } from "app/components/news";
+import BlogItems from "app/components/blogitems";
 
 export default function Page() {
   return (
     <div>
-      <h1 className="mb-8 text-2xl font-semibold tracking-tighter">
-        Matt Gibson
+          <h1 className="mb-4 text-3xl leading-none text-gray-900 dark:text-white font-bold">
+          Matt Gibson
       </h1>
       <div className="flex flex-wrap">
         <figure className="p-8 md:p-0 mb-3 float-left mr-5 flex-initial">
@@ -30,6 +31,10 @@ export default function Page() {
         </div>
         <div className="my-8 block">
           <NewsItems />
+          <h1 className="mb-4 text-3xl leading-none text-gray-900 dark:text-white font-bold mt-5">
+            Articles
+            </h1>
+          <BlogItems />
         </div>
       </div>
     </div>
