@@ -16,13 +16,6 @@ export const metadata = {
   };
 
 
-  export function getMdxSlugs(dirPath: string): string[] {
-    return fs
-      .readdirSync(dirPath)
-      .filter((file) => file.endsWith('.mdx'))
-      .map((file) => path.basename(file, '.mdx'))
-  }
-
 export default async function Page() {
 
   
@@ -39,7 +32,12 @@ export default async function Page() {
     return 0;
   }
 
-
+  function getMdxSlugs(dirPath: string): string[] {
+    return fs
+      .readdirSync(dirPath)
+      .filter((file) => file.endsWith('.mdx'))
+      .map((file) => path.basename(file, '.mdx'))
+  }
 
 
   const slugs = getMdxSlugs("content")
