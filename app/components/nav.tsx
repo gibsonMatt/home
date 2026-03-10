@@ -7,7 +7,7 @@ const navItems = {
   "/publications": {
     name: "publications",
   },
-  "/cv_for_web.pdf": {
+  "/cv": {
     name: "cv",
   },
   "/resources": {
