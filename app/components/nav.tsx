@@ -7,6 +7,9 @@ const navItems = {
   "/publications": {
     name: "publications",
   },
+  "/research": {
+    name: "research",
+  },
   "/links": {
     name: "links",
   },
