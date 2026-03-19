@@ -8,7 +8,7 @@ export default function MainLayout({
 }) {
   return (
     <div className="min-h-screen text-black bg-white dark:text-white dark:bg-black">
-      <div className="max-w-2xl mx-auto px-6 mt-12 mb-12">
+      <div className="max-w-2xl mx-auto px-6 pt-12 pb-12">
         <main className="flex-auto min-w-0 flex flex-col">
           <Navbar />
           {children}
