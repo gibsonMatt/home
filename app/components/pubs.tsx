@@ -8,6 +8,9 @@ type Entry = {
   year?: string;
   url?: string;
   journal?: string;
+  volume?: string;
+  number?: string;
+  pages?: string;
 };
 
 type StringValue = {
@@ -20,7 +23,16 @@ type RawField = {
 };
 
 function parseBibs() {
-  const focal_fields: string[] = ["author", "title", "year", "journal", "url"];
+  const focal_fields: string[] = [
+    "author",
+    "title",
+    "year",
+    "journal",
+    "url",
+    "volume",
+    "number",
+    "pages",
+  ];
 
   const fileContents: string = fs
     .readFileSync("app/publications/pubs.bibtex")
@@ -47,29 +59,74 @@ function parseBibs() {
     parsed_results.push(parsedEntry);
   });
 
+  // Sort by year descending
+  parsed_results.sort((a, b) => {
+    const yearA = parseInt(a.year || "0");
+    const yearB = parseInt(b.year || "0");
+    return yearB - yearA;
+  });
+
   return parsed_results;
+}
+
+function highlightAuthor(authorString: string) {
+  // Bold "Gibson" occurrences
+  const parts = authorString.split(/(Gibson,?\s*(?:Matthew\s*(?:JS|J\.?S\.?)?|Matt)?)/i);
+  return parts.map((part, i) => {
+    if (/Gibson/i.test(part)) {
+      return (
+        <span key={i} className="font-semibold text-neutral-900 dark:text-neutral-100">
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
+function buildCitation(entry: Entry) {
+  const parts: string[] = [];
+  if (entry.volume) parts.push(entry.volume);
+  if (entry.number) parts.push(`(${entry.number})`);
+  if (entry.pages) parts.push(`: ${entry.pages}`);
+  return parts.join("");
 }
 
 export async function Publications() {
   const bibs: Entry[] = parseBibs();
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-2">
       {bibs.map((entry, i) => {
-        const content = (
-          <>
-            <span className="text-neutral-600 dark:text-neutral-400">
-              {entry.author}
-            </span>
-            .{" "}
-            <span className="font-semibold text-neutral-900 dark:text-neutral-100">
-              {entry.year}
-            </span>
-            . {entry.title}.{" "}
-            <span className="italic text-neutral-500 dark:text-neutral-400">
-              {entry.journal}
-            </span>
-          </>
+        const citation = buildCitation(entry);
+
+        const inner = (
+          <div className="py-3.5 px-4 -mx-4 rounded-lg">
+            <div className="flex items-baseline gap-3 mb-1.5">
+              <span className="text-2xl font-bold text-neutral-200 dark:text-neutral-700 select-none leading-none">
+                {entry.year}
+              </span>
+              <h3 className="text-base font-medium text-neutral-900 dark:text-neutral-100 leading-snug">
+                {entry.title}
+              </h3>
+            </div>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed ml-[calc(2ch+0.75rem)]">
+              {highlightAuthor(entry.author || "")}
+            </p>
+            {entry.journal && (
+              <p className="text-sm mt-1 ml-[calc(2ch+0.75rem)]">
+                <span className="italic text-neutral-400 dark:text-neutral-500">
+                  {entry.journal}
+                </span>
+                {citation && (
+                  <span className="text-neutral-400 dark:text-neutral-600">
+                    {" "}
+                    {citation}
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
         );
 
         if (entry.url) {
@@ -77,21 +134,16 @@ export async function Publications() {
             <a
               key={i}
               href={entry.url}
-              className="block py-2 px-3 -mx-3 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-900/50 transition-colors text-sm leading-relaxed group"
+              className="block group hover:bg-neutral-50 dark:hover:bg-neutral-900/50 rounded-lg transition-colors"
             >
-              <span className="group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                {content}
-              </span>
+              {inner}
             </a>
           );
         }
 
         return (
-          <div
-            key={i}
-            className="py-2 px-3 -mx-3 text-sm leading-relaxed"
-          >
-            {content}
+          <div key={i}>
+            {inner}
           </div>
         );
       })}
