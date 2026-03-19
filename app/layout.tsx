@@ -12,10 +12,6 @@ export const metadata: Metadata = {
     template: "",
   },
   description: "Matt Gibson — Software Engineer",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
-  ],
   openGraph: {
     title: "Matt Gibson",
     description: "Matt Gibson — Software Engineer",
@@ -40,6 +36,15 @@ export const metadata: Metadata = {
 const cx = (...classes: (string | undefined)[]) =>
   classes.filter(Boolean).join(" ");
 
+export const viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -50,6 +55,10 @@ export default function RootLayout({
       lang="en"
       className={cx(GeistSans.variable, GeistMono.variable)}
     >
+      <head>
+        <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+      </head>
       <body className="antialiased bg-white dark:bg-black">
         {children}
         <Analytics />
