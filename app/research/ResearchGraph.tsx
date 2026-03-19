@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import * as d3 from "d3";
 import {
   nodes as rawNodes,
@@ -11,13 +11,13 @@ import {
 } from "./research_data";
 
 const TYPE_COLORS: Record<NodeType, string> = {
-  paper: "#3b82f6",       // blue
-  organism: "#22c55e",    // green
-  method: "#a855f7",      // purple
-  theme: "#f59e0b",       // amber
-  collaborator: "#ec4899", // pink
-  tool: "#06b6d4",        // cyan
-  location: "#ef4444",    // red
+  paper: "#3b82f6",
+  organism: "#22c55e",
+  method: "#a855f7",
+  theme: "#f59e0b",
+  collaborator: "#ec4899",
+  tool: "#06b6d4",
+  location: "#ef4444",
 };
 
 const TYPE_LABELS: Record<NodeType, string> = {
@@ -39,31 +39,28 @@ interface SimLink extends d3.SimulationLinkDatum<SimNode> {
 export default function ResearchGraph() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [tooltip, setTooltip] = useState<{
-    node: ResearchNode;
-    x: number;
-    y: number;
-  } | null>(null);
+  const [selectedNode, setSelectedNode] = useState<ResearchNode | null>(null);
   const [activeTypes, setActiveTypes] = useState<Set<NodeType>>(
-    () => new Set<NodeType>([
-      "paper",
-      "organism",
-      "method",
-      "theme",
-      "collaborator",
-      "tool",
-      "location",
-    ]),
+    () =>
+      new Set<NodeType>([
+        "paper",
+        "organism",
+        "method",
+        "theme",
+        "collaborator",
+        "tool",
+        "location",
+      ]),
   );
+
+  const closePanel = useCallback(() => setSelectedNode(null), []);
 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current) return;
 
-    const container = containerRef.current;
-    const width = container.clientWidth;
-    const height = Math.max(600, window.innerHeight - 300);
+    const width = window.innerWidth;
+    const height = window.innerHeight;
 
-    // Filter nodes and links by active types
     const filteredNodeIds = new Set(
       rawNodes.filter((n) => activeTypes.has(n.type)).map((n) => n.id),
     );
@@ -72,28 +69,44 @@ export default function ResearchGraph() {
       .map((d) => ({ ...d }));
     const linkData: SimLink[] = rawLinks
       .filter(
-        (l) => filteredNodeIds.has(l.source as string) && filteredNodeIds.has(l.target as string),
+        (l) =>
+          filteredNodeIds.has(l.source as string) &&
+          filteredNodeIds.has(l.target as string),
       )
       .map((d) => ({ ...d }));
 
     const svg = d3
       .select(svgRef.current)
-      .attr("viewBox", [0, 0, width, height])
       .attr("width", width)
-      .attr("height", height);
+      .attr("height", height)
+      .attr("viewBox", [0, 0, width, height]);
 
     svg.selectAll("*").remove();
 
+    // Defs for glow
+    const defs = svg.append("defs");
+    const filter = defs.append("filter").attr("id", "glow");
+    filter
+      .append("feGaussianBlur")
+      .attr("stdDeviation", "3")
+      .attr("result", "coloredBlur");
+    const feMerge = filter.append("feMerge");
+    feMerge.append("feMergeNode").attr("in", "coloredBlur");
+    feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
     const g = svg.append("g");
 
-    // Zoom
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.3, 4])
+      .scaleExtent([0.2, 5])
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
       });
     svg.call(zoom);
+
+    // Center initially
+    const initialTransform = d3.zoomIdentity.translate(width * 0.05, height * 0.05).scale(0.9);
+    svg.call(zoom.transform, initialTransform);
 
     const simulation = d3
       .forceSimulation<SimNode>(nodeData)
@@ -102,41 +115,38 @@ export default function ResearchGraph() {
         d3
           .forceLink<SimNode, SimLink>(linkData)
           .id((d) => d.id)
-          .distance(80)
-          .strength((d) => (d.strength || 0.5) * 0.3),
+          .distance(100)
+          .strength((d) => (d.strength || 0.5) * 0.5),
       )
-      .force("charge", d3.forceManyBody().strength(-200))
-      .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide().radius((d: any) => (d.size || 6) + 4));
+      .force("charge", d3.forceManyBody().strength(-300).distanceMax(500))
+      .force("center", d3.forceCenter(width / 2, height / 2).strength(0.1))
+      .force(
+        "collision",
+        d3.forceCollide().radius((d: any) => (d.size || 6) + 6),
+      )
+      .force("x", d3.forceX(width / 2).strength(0.05))
+      .force("y", d3.forceY(height / 2).strength(0.05));
 
-    // Links
+    // Links — visible!
     const link = g
       .append("g")
-      .attr("class", "links")
       .selectAll("line")
       .data(linkData)
       .join("line")
-      .attr("stroke", "#404040")
-      .attr("stroke-opacity", 0.15)
+      .attr("stroke", "#ffffff")
+      .attr("stroke-opacity", 0.08)
       .attr("stroke-width", 1);
 
-    // Nodes
-    const node = g
+    // Node groups
+    const nodeGroup = g
       .append("g")
-      .attr("class", "nodes")
-      .selectAll<SVGCircleElement, SimNode>("circle")
+      .selectAll<SVGGElement, SimNode>("g")
       .data(nodeData)
-      .join("circle")
-      .attr("r", (d) => d.size || 6)
-      .attr("fill", (d) => TYPE_COLORS[d.type])
-      .attr("fill-opacity", 0.85)
-      .attr("stroke", (d) => TYPE_COLORS[d.type])
-      .attr("stroke-width", 1.5)
-      .attr("stroke-opacity", 0.3)
+      .join("g")
       .attr("cursor", "pointer")
       .call(
         d3
-          .drag<SVGCircleElement, SimNode>()
+          .drag<SVGGElement, SimNode>()
           .on("start", (event, d) => {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
@@ -153,53 +163,68 @@ export default function ResearchGraph() {
           }),
       );
 
+    // Node circles
+    nodeGroup
+      .append("circle")
+      .attr("r", (d) => d.size || 6)
+      .attr("fill", (d) => TYPE_COLORS[d.type])
+      .attr("fill-opacity", 0.8)
+      .attr("stroke", (d) => TYPE_COLORS[d.type])
+      .attr("stroke-width", 2)
+      .attr("stroke-opacity", 0.3)
+      .attr("filter", "url(#glow)");
+
     // Labels
-    const label = g
-      .append("g")
-      .attr("class", "labels")
-      .selectAll<SVGTextElement, SimNode>("text")
-      .data(nodeData)
-      .join("text")
+    nodeGroup
+      .append("text")
       .text((d) => d.label)
-      .attr("font-size", (d) => Math.max(8, (d.size || 6) * 0.7))
-      .attr("fill", "#999")
+      .attr("font-size", (d) => Math.max(9, (d.size || 6) * 0.65))
+      .attr("fill", "#888")
       .attr("text-anchor", "middle")
-      .attr("dy", (d) => (d.size || 6) + 12)
+      .attr("dy", (d) => (d.size || 6) + 14)
       .attr("pointer-events", "none")
-      .style("user-select", "none");
+      .style("user-select", "none")
+      .style("font-family", "var(--font-geist-sans), system-ui, sans-serif");
 
-    // Hover interaction
-    node
-      .on("mouseenter", (event, d) => {
-        const [x, y] = d3.pointer(event, container);
-        setTooltip({ node: d, x, y });
-
-        // Highlight connected
+    // Interactions
+    nodeGroup
+      .on("mouseenter", (_event, d) => {
         const connectedIds = new Set<string>();
         connectedIds.add(d.id);
         linkData.forEach((l) => {
-          const sid = typeof l.source === "object" ? (l.source as SimNode).id : l.source;
-          const tid = typeof l.target === "object" ? (l.target as SimNode).id : l.target;
+          const sid =
+            typeof l.source === "object"
+              ? (l.source as SimNode).id
+              : l.source;
+          const tid =
+            typeof l.target === "object"
+              ? (l.target as SimNode).id
+              : l.target;
           if (sid === d.id) connectedIds.add(tid as string);
           if (tid === d.id) connectedIds.add(sid as string);
         });
 
-        node.attr("fill-opacity", (n) => (connectedIds.has(n.id) ? 1 : 0.15));
-        link.attr("stroke-opacity", (l) => {
-          const sid = typeof l.source === "object" ? (l.source as SimNode).id : l.source;
-          const tid = typeof l.target === "object" ? (l.target as SimNode).id : l.target;
-          return sid === d.id || tid === d.id ? 0.5 : 0.03;
+        nodeGroup.select("circle").attr("fill-opacity", (n: any) =>
+          connectedIds.has(n.id) ? 1 : 0.1,
+        );
+        nodeGroup.select("text").attr("fill-opacity", (n: any) =>
+          connectedIds.has(n.id) ? 1 : 0.15,
+        );
+        link.attr("stroke-opacity", (l: any) => {
+          const sid =
+            typeof l.source === "object" ? l.source.id : l.source;
+          const tid =
+            typeof l.target === "object" ? l.target.id : l.target;
+          return sid === d.id || tid === d.id ? 0.35 : 0.02;
         });
-        label.attr("fill-opacity", (n) => (connectedIds.has(n.id) ? 1 : 0.1));
       })
       .on("mouseleave", () => {
-        setTooltip(null);
-        node.attr("fill-opacity", 0.85);
-        link.attr("stroke-opacity", 0.15);
-        label.attr("fill-opacity", 1);
+        nodeGroup.select("circle").attr("fill-opacity", 0.8);
+        nodeGroup.select("text").attr("fill-opacity", 1);
+        link.attr("stroke-opacity", 0.08);
       })
       .on("click", (_event, d) => {
-        if (d.url) window.open(d.url, "_blank");
+        setSelectedNode(d);
       });
 
     simulation.on("tick", () => {
@@ -209,9 +234,7 @@ export default function ResearchGraph() {
         .attr("x2", (d: any) => d.target.x)
         .attr("y2", (d: any) => d.target.y);
 
-      node.attr("cx", (d) => d.x!).attr("cy", (d) => d.y!);
-
-      label.attr("x", (d) => d.x!).attr("y", (d) => d.y!);
+      nodeGroup.attr("transform", (d) => `translate(${d.x},${d.y})`);
     });
 
     return () => {
@@ -222,35 +245,31 @@ export default function ResearchGraph() {
   const toggleType = (type: NodeType) => {
     setActiveTypes((prev) => {
       const next = new Set(prev);
-      if (next.has(type)) {
-        next.delete(type);
-      } else {
-        next.add(type);
-      }
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
       return next;
     });
   };
 
   return (
-    <div className="relative">
-      {/* Legend / Filters */}
-      <div className="flex flex-wrap gap-2 mb-6">
+    <div ref={containerRef} className="relative w-full h-full">
+      {/* Filter pills — bottom left */}
+      <div className="absolute bottom-4 left-4 z-20 flex flex-wrap gap-1.5">
         {(Object.keys(TYPE_COLORS) as NodeType[]).map((type) => (
           <button
             key={type}
             onClick={() => toggleType(type)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all backdrop-blur-sm"
             style={{
               backgroundColor: activeTypes.has(type)
-                ? TYPE_COLORS[type] + "20"
-                : "transparent",
-              color: activeTypes.has(type) ? TYPE_COLORS[type] : "#666",
-              border: `1px solid ${activeTypes.has(type) ? TYPE_COLORS[type] + "40" : "#333"}`,
-              opacity: activeTypes.has(type) ? 1 : 0.5,
+                ? TYPE_COLORS[type] + "18"
+                : "rgba(255,255,255,0.03)",
+              color: activeTypes.has(type) ? TYPE_COLORS[type] : "#555",
+              border: `1px solid ${activeTypes.has(type) ? TYPE_COLORS[type] + "30" : "#222"}`,
             }}
           >
             <span
-              className="w-2 h-2 rounded-full"
+              className="w-1.5 h-1.5 rounded-full"
               style={{ backgroundColor: TYPE_COLORS[type] }}
             />
             {TYPE_LABELS[type]}
@@ -258,45 +277,145 @@ export default function ResearchGraph() {
         ))}
       </div>
 
-      {/* Graph */}
-      <div ref={containerRef} className="relative w-full rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden bg-neutral-50 dark:bg-neutral-950">
-        <svg ref={svgRef} className="w-full" />
+      {/* Graph canvas */}
+      <svg ref={svgRef} className="w-full h-full" />
 
-        {/* Tooltip */}
-        {tooltip && (
-          <div
-            className="absolute z-10 max-w-xs p-3 rounded-lg bg-white dark:bg-neutral-900 shadow-xl border border-neutral-200 dark:border-neutral-800 pointer-events-none"
-            style={{
-              left: Math.min(tooltip.x + 15, (containerRef.current?.clientWidth || 600) - 260),
-              top: tooltip.y - 10,
-            }}
-          >
-            <div className="flex items-center gap-2 mb-1">
+      {/* Detail panel */}
+      {selectedNode && (
+        <div className="absolute top-4 right-4 z-30 w-80 max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl">
+          <div className="p-5">
+            {/* Close */}
+            <button
+              onClick={closePanel}
+              className="absolute top-3 right-3 text-neutral-500 hover:text-white transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M12 4L4 12M4 4L12 12"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+
+            {/* Type badge */}
+            <div className="flex items-center gap-2 mb-3">
               <span
-                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: TYPE_COLORS[tooltip.node.type] }}
+                className="w-3 h-3 rounded-full flex-shrink-0"
+                style={{ backgroundColor: TYPE_COLORS[selectedNode.type] }}
               />
-              <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                {tooltip.node.label}
+              <span
+                className="text-[10px] font-semibold uppercase tracking-widest"
+                style={{ color: TYPE_COLORS[selectedNode.type] }}
+              >
+                {selectedNode.type}
               </span>
-              {tooltip.node.year && (
-                <span className="text-xs text-neutral-400">{tooltip.node.year}</span>
+              {selectedNode.year && (
+                <span className="text-[10px] text-neutral-500 ml-auto">
+                  {selectedNode.year}
+                </span>
               )}
             </div>
-            {tooltip.node.detail && (
-              <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                {tooltip.node.detail}
+
+            {/* Image */}
+            {selectedNode.image && (
+              <div className="mb-4 rounded-lg overflow-hidden">
+                <img
+                  src={selectedNode.image}
+                  alt={selectedNode.label}
+                  className="w-full h-40 object-cover"
+                />
+                {selectedNode.imageCredit && (
+                  <p className="text-[9px] text-neutral-600 mt-1 px-0.5">
+                    {selectedNode.imageCredit}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Title */}
+            <h2 className="text-lg font-semibold text-white leading-snug mb-2">
+              {selectedNode.label}
+            </h2>
+
+            {/* Taxonomy */}
+            {selectedNode.taxonomy && (
+              <p className="text-xs text-neutral-500 italic mb-3">
+                {selectedNode.taxonomy}
               </p>
             )}
-            {tooltip.node.url && (
-              <p className="text-xs text-blue-500 mt-1">Click to open →</p>
+
+            {/* Description */}
+            {selectedNode.detail && (
+              <p className="text-sm text-neutral-400 leading-relaxed mb-4">
+                {selectedNode.detail}
+              </p>
+            )}
+
+            {/* Abstract (papers) */}
+            {selectedNode.abstract && (
+              <div className="mb-4">
+                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-600 mb-1">
+                  Abstract
+                </h3>
+                <p className="text-xs text-neutral-500 leading-relaxed">
+                  {selectedNode.abstract}
+                </p>
+              </div>
+            )}
+
+            {/* External links */}
+            {selectedNode.externalLinks && selectedNode.externalLinks.length > 0 && (
+              <div className="space-y-1.5 mb-4">
+                {selectedNode.externalLinks.map((link, i) => (
+                  <a
+                    key={i}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs text-neutral-400 hover:text-white transition-colors group"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      className="flex-shrink-0 opacity-50 group-hover:opacity-100"
+                    >
+                      <path
+                        d="M2.07102 11.3494L0.963068 10.2415L9.2017 1.98864H2.83807L2.85227 0.454545H11.8438V9.46023H10.2955L10.3097 3.09659L2.07102 11.3494Z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            )}
+
+            {/* Primary URL */}
+            {selectedNode.url && (
+              <a
+                href={selectedNode.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
+                style={{
+                  backgroundColor: TYPE_COLORS[selectedNode.type] + "15",
+                  color: TYPE_COLORS[selectedNode.type],
+                }}
+              >
+                Open →
+              </a>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <p className="mt-3 text-xs text-neutral-400 dark:text-neutral-600 text-center">
-        Drag nodes to explore. Hover for details. Click linked nodes to open. Scroll to zoom.
+      {/* Hint */}
+      <p className="absolute bottom-4 right-4 z-10 text-[10px] text-neutral-600">
+        drag · scroll to zoom · click to explore
       </p>
     </div>
   );

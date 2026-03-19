@@ -10,6 +10,11 @@ export type NodeType =
   | "tool"
   | "location";
 
+export interface ExternalLink {
+  label: string;
+  url: string;
+}
+
 export interface ResearchNode {
   id: string;
   label: string;
@@ -17,7 +22,12 @@ export interface ResearchNode {
   year?: number;
   detail?: string;
   url?: string;
-  size?: number; // visual weight
+  size?: number;
+  image?: string;
+  imageCredit?: string;
+  taxonomy?: string;
+  abstract?: string;
+  externalLinks?: ExternalLink[];
 }
 
 export interface ResearchLink {
