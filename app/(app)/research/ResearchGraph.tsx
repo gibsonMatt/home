@@ -76,7 +76,6 @@ export default function ResearchGraph() {
         "organism",
         "method",
         "theme",
-        "collaborator",
         "tool",
         "location",
       ]),
