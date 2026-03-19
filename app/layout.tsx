@@ -12,6 +12,10 @@ export const metadata: Metadata = {
     template: "",
   },
   description: "Matt Gibson — Software Engineer",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
   openGraph: {
     title: "Matt Gibson",
     description: "Matt Gibson — Software Engineer",
@@ -46,7 +50,7 @@ export default function RootLayout({
       lang="en"
       className={cx(GeistSans.variable, GeistMono.variable)}
     >
-      <body className="antialiased">
+      <body className="antialiased bg-white dark:bg-black">
         {children}
         <Analytics />
         <SpeedInsights />
