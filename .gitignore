@@ -29,6 +29,8 @@ yarn-error.log*
 
 # env files
 .env
+.env.local
+.env.local.*
 
 # vercel
 .vercel
@@ -45,3 +47,4 @@ TOOLS.md
 USER.md
 MEMORY.md
 BOOTSTRAP.md
+scripts/

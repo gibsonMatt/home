@@ -2,12 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as d3 from "d3";
-import {
-  nodes as rawNodes,
-  links as rawLinks,
-  ResearchNode,
-  NodeType,
-} from "./research_data";
+import type { ResearchNode, ResearchLink, NodeType } from "./types";
 
 // ─── Default colors (can be overridden via /config) ───
 const DEFAULT_COLORS: Record<NodeType, string> = {
@@ -61,6 +56,9 @@ const DEFAULT_CONFIG: Config = {
 export default function ResearchGraph() {
   const svgRef = useRef<SVGSVGElement>(null);
   const cmdRef = useRef<HTMLInputElement>(null);
+  const [rawNodes, setRawNodes] = useState<ResearchNode[]>([]);
+  const [rawLinks, setRawLinks] = useState<ResearchLink[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedNode, setSelectedNode] = useState<ResearchNode | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [config, setConfig] = useState<Config>({ ...DEFAULT_CONFIG });
@@ -80,6 +78,21 @@ export default function ResearchGraph() {
         "location",
       ]),
   );
+
+  // Fetch data from API
+  useEffect(() => {
+    fetch("/api/research")
+      .then((r) => r.json())
+      .then((data) => {
+        setRawNodes(data.nodes);
+        setRawLinks(data.links);
+        setLoading(false);
+      })
+      .catch((e) => {
+        console.error("Failed to load research data:", e);
+        setLoading(false);
+      });
+  }, []);
 
   // Track dimensions
   useEffect(() => {
@@ -171,7 +184,7 @@ export default function ResearchGraph() {
 
   // D3 graph
   useEffect(() => {
-    if (!svgRef.current || dimensions.width === 0) return;
+    if (!svgRef.current || dimensions.width === 0 || loading || rawNodes.length === 0) return;
 
     const { width, height } = dimensions;
     const colors = config.colors;
@@ -369,7 +382,7 @@ export default function ResearchGraph() {
     return () => {
       simulation.stop();
     };
-  }, [activeTypes, dimensions, config]);
+  }, [activeTypes, dimensions, config, loading, rawNodes, rawLinks]);
 
   const toggleType = (type: NodeType) => {
     setActiveTypes((prev) => {
@@ -379,6 +392,19 @@ export default function ResearchGraph() {
       return next;
     });
   };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center">
+        <p
+          className="text-sm text-neutral-600 animate-pulse"
+          style={{ fontFamily: "'Geist Mono', 'SF Mono', monospace" }}
+        >
+          loading universe…
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
