@@ -1,5 +1,5 @@
-import { portfolio_data } from "app/portfolio/portfolio_data";
-import { resource_data } from "app/resources/resource_data";
+import { portfolio_data } from "app/(main)/portfolio/portfolio_data";
+import { resource_data } from "app/(main)/resources/resource_data";
 
 export const metadata = {
   title: "Matt Gibson | Links",

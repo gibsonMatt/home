@@ -1,4 +1,4 @@
-import { Publications } from "app/components/pubs";
+import { Publications } from "app/(main)/components/pubs";
 
 export const metadata = {
   title: "Matt Gibson | Publications",

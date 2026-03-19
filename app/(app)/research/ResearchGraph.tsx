@@ -6,7 +6,6 @@ import {
   nodes as rawNodes,
   links as rawLinks,
   ResearchNode,
-  ResearchLink,
   NodeType,
 } from "./research_data";
 
@@ -25,9 +24,9 @@ const TYPE_LABELS: Record<NodeType, string> = {
   organism: "Organisms",
   method: "Methods",
   theme: "Themes",
-  collaborator: "Collaborators",
+  collaborator: "People",
   tool: "Software",
-  location: "Locations",
+  location: "Places",
 };
 
 interface SimNode extends ResearchNode, d3.SimulationNodeDatum {}
@@ -38,8 +37,8 @@ interface SimLink extends d3.SimulationLinkDatum<SimNode> {
 
 export default function ResearchGraph() {
   const svgRef = useRef<SVGSVGElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [selectedNode, setSelectedNode] = useState<ResearchNode | null>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [activeTypes, setActiveTypes] = useState<Set<NodeType>>(
     () =>
       new Set<NodeType>([
@@ -53,13 +52,19 @@ export default function ResearchGraph() {
       ]),
   );
 
-  const closePanel = useCallback(() => setSelectedNode(null), []);
+  // Track dimensions
+  useEffect(() => {
+    const update = () =>
+      setDimensions({ width: window.innerWidth, height: window.innerHeight });
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   useEffect(() => {
-    if (!svgRef.current || !containerRef.current) return;
+    if (!svgRef.current || dimensions.width === 0) return;
 
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+    const { width, height } = dimensions;
 
     const filteredNodeIds = new Set(
       rawNodes.filter((n) => activeTypes.has(n.type)).map((n) => n.id),
@@ -83,12 +88,12 @@ export default function ResearchGraph() {
 
     svg.selectAll("*").remove();
 
-    // Defs for glow
+    // Glow filter
     const defs = svg.append("defs");
     const filter = defs.append("filter").attr("id", "glow");
     filter
       .append("feGaussianBlur")
-      .attr("stdDeviation", "3")
+      .attr("stdDeviation", "2.5")
       .attr("result", "coloredBlur");
     const feMerge = filter.append("feMerge");
     feMerge.append("feMergeNode").attr("in", "coloredBlur");
@@ -96,17 +101,24 @@ export default function ResearchGraph() {
 
     const g = svg.append("g");
 
+    // Zoom — works on both desktop and mobile
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.2, 5])
+      .scaleExtent([0.15, 5])
+      .filter((event) => {
+        // Allow all zoom/pan events except double-click
+        return !event.type.startsWith("dblclick");
+      })
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
       });
-    svg.call(zoom);
 
-    // Center initially
-    const initialTransform = d3.zoomIdentity.translate(width * 0.05, height * 0.05).scale(0.9);
-    svg.call(zoom.transform, initialTransform);
+    svg.call(zoom);
+    // Start centered
+    svg.call(
+      zoom.transform,
+      d3.zoomIdentity.translate(width * 0.1, height * 0.1).scale(0.8),
+    );
 
     const simulation = d3
       .forceSimulation<SimNode>(nodeData)
@@ -115,27 +127,27 @@ export default function ResearchGraph() {
         d3
           .forceLink<SimNode, SimLink>(linkData)
           .id((d) => d.id)
-          .distance(100)
-          .strength((d) => (d.strength || 0.5) * 0.5),
+          .distance(90)
+          .strength((d) => (d.strength || 0.5) * 0.6),
       )
-      .force("charge", d3.forceManyBody().strength(-300).distanceMax(500))
-      .force("center", d3.forceCenter(width / 2, height / 2).strength(0.1))
+      .force("charge", d3.forceManyBody().strength(-250).distanceMax(600))
+      .force("center", d3.forceCenter(width / 2, height / 2).strength(0.15))
       .force(
         "collision",
-        d3.forceCollide().radius((d: any) => (d.size || 6) + 6),
+        d3.forceCollide().radius((d: any) => (d.size || 6) + 5),
       )
-      .force("x", d3.forceX(width / 2).strength(0.05))
-      .force("y", d3.forceY(height / 2).strength(0.05));
+      .force("x", d3.forceX(width / 2).strength(0.06))
+      .force("y", d3.forceY(height / 2).strength(0.06));
 
-    // Links — visible!
+    // Edges
     const link = g
       .append("g")
       .selectAll("line")
       .data(linkData)
       .join("line")
       .attr("stroke", "#ffffff")
-      .attr("stroke-opacity", 0.08)
-      .attr("stroke-width", 1);
+      .attr("stroke-opacity", 0.06)
+      .attr("stroke-width", 0.8);
 
     // Node groups
     const nodeGroup = g
@@ -163,7 +175,7 @@ export default function ResearchGraph() {
           }),
       );
 
-    // Node circles
+    // Circles
     nodeGroup
       .append("circle")
       .attr("r", (d) => d.size || 6)
@@ -171,61 +183,72 @@ export default function ResearchGraph() {
       .attr("fill-opacity", 0.8)
       .attr("stroke", (d) => TYPE_COLORS[d.type])
       .attr("stroke-width", 2)
-      .attr("stroke-opacity", 0.3)
+      .attr("stroke-opacity", 0.25)
       .attr("filter", "url(#glow)");
 
     // Labels
     nodeGroup
       .append("text")
       .text((d) => d.label)
-      .attr("font-size", (d) => Math.max(9, (d.size || 6) * 0.65))
-      .attr("fill", "#888")
+      .attr("font-size", (d) => Math.max(8, (d.size || 6) * 0.6))
+      .attr("fill", "#777")
       .attr("text-anchor", "middle")
-      .attr("dy", (d) => (d.size || 6) + 14)
+      .attr("dy", (d) => (d.size || 6) + 13)
       .attr("pointer-events", "none")
       .style("user-select", "none")
       .style("font-family", "var(--font-geist-sans), system-ui, sans-serif");
 
-    // Interactions
+    // Hover
     nodeGroup
       .on("mouseenter", (_event, d) => {
-        const connectedIds = new Set<string>();
-        connectedIds.add(d.id);
+        const connected = new Set<string>([d.id]);
         linkData.forEach((l) => {
           const sid =
             typeof l.source === "object"
               ? (l.source as SimNode).id
-              : l.source;
+              : (l.source as string);
           const tid =
             typeof l.target === "object"
               ? (l.target as SimNode).id
-              : l.target;
-          if (sid === d.id) connectedIds.add(tid as string);
-          if (tid === d.id) connectedIds.add(sid as string);
+              : (l.target as string);
+          if (sid === d.id) connected.add(tid);
+          if (tid === d.id) connected.add(sid);
         });
 
-        nodeGroup.select("circle").attr("fill-opacity", (n: any) =>
-          connectedIds.has(n.id) ? 1 : 0.1,
-        );
-        nodeGroup.select("text").attr("fill-opacity", (n: any) =>
-          connectedIds.has(n.id) ? 1 : 0.15,
-        );
+        nodeGroup
+          .select("circle")
+          .attr("fill-opacity", (n: any) =>
+            connected.has(n.id) ? 1 : 0.1,
+          );
+        nodeGroup
+          .select("text")
+          .attr("fill-opacity", (n: any) =>
+            connected.has(n.id) ? 1 : 0.1,
+          );
         link.attr("stroke-opacity", (l: any) => {
           const sid =
             typeof l.source === "object" ? l.source.id : l.source;
           const tid =
             typeof l.target === "object" ? l.target.id : l.target;
-          return sid === d.id || tid === d.id ? 0.35 : 0.02;
+          return sid === d.id || tid === d.id ? 0.4 : 0.015;
         });
       })
       .on("mouseleave", () => {
         nodeGroup.select("circle").attr("fill-opacity", 0.8);
         nodeGroup.select("text").attr("fill-opacity", 1);
-        link.attr("stroke-opacity", 0.08);
-      })
-      .on("click", (_event, d) => {
-        setSelectedNode(d);
+        link.attr("stroke-opacity", 0.06);
       });
+
+    // Click to select (works on touch too)
+    nodeGroup.on("click", (_event, d) => {
+      _event.stopPropagation();
+      setSelectedNode(d);
+    });
+
+    // Click background to deselect
+    svg.on("click", () => {
+      setSelectedNode(null);
+    });
 
     simulation.on("tick", () => {
       link
@@ -240,7 +263,7 @@ export default function ResearchGraph() {
     return () => {
       simulation.stop();
     };
-  }, [activeTypes]);
+  }, [activeTypes, dimensions]);
 
   const toggleType = (type: NodeType) => {
     setActiveTypes((prev) => {
@@ -252,9 +275,16 @@ export default function ResearchGraph() {
   };
 
   return (
-    <div ref={containerRef} className="relative w-full h-full">
+    <>
+      {/* SVG fills entire screen */}
+      <svg
+        ref={svgRef}
+        className="fixed inset-0 w-screen h-screen"
+        style={{ touchAction: "none" }}
+      />
+
       {/* Filter pills — bottom left */}
-      <div className="absolute bottom-4 left-4 z-20 flex flex-wrap gap-1.5">
+      <div className="fixed bottom-4 left-4 z-40 flex flex-wrap gap-1.5 max-w-[calc(100vw-2rem)]">
         {(Object.keys(TYPE_COLORS) as NodeType[]).map((type) => (
           <button
             key={type}
@@ -269,7 +299,7 @@ export default function ResearchGraph() {
             }}
           >
             <span
-              className="w-1.5 h-1.5 rounded-full"
+              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
               style={{ backgroundColor: TYPE_COLORS[type] }}
             />
             {TYPE_LABELS[type]}
@@ -277,19 +307,18 @@ export default function ResearchGraph() {
         ))}
       </div>
 
-      {/* Graph canvas */}
-      <svg ref={svgRef} className="w-full h-full" />
-
       {/* Detail panel */}
       {selectedNode && (
-        <div className="absolute top-4 right-4 z-30 w-80 max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl bg-black/80 backdrop-blur-xl border border-white/10 shadow-2xl">
-          <div className="p-5">
+        <div
+          className="fixed top-0 right-0 z-50 w-80 max-w-[85vw] h-screen overflow-y-auto bg-black/90 backdrop-blur-xl border-l border-white/10 shadow-2xl"
+        >
+          <div className="p-5 pt-6">
             {/* Close */}
             <button
-              onClick={closePanel}
-              className="absolute top-3 right-3 text-neutral-500 hover:text-white transition-colors"
+              onClick={() => setSelectedNode(null)}
+              className="absolute top-4 right-4 text-neutral-500 hover:text-white transition-colors p-1"
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
                 <path
                   d="M12 4L4 12M4 4L12 12"
                   stroke="currentColor"
@@ -325,9 +354,10 @@ export default function ResearchGraph() {
                   src={selectedNode.image}
                   alt={selectedNode.label}
                   className="w-full h-40 object-cover"
+                  loading="lazy"
                 />
                 {selectedNode.imageCredit && (
-                  <p className="text-[9px] text-neutral-600 mt-1 px-0.5">
+                  <p className="text-[9px] text-neutral-600 mt-1">
                     {selectedNode.imageCredit}
                   </p>
                 )}
@@ -353,10 +383,10 @@ export default function ResearchGraph() {
               </p>
             )}
 
-            {/* Abstract (papers) */}
+            {/* Abstract */}
             {selectedNode.abstract && (
               <div className="mb-4">
-                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-600 mb-1">
+                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-600 mb-1.5">
                   Abstract
                 </h3>
                 <p className="text-xs text-neutral-500 leading-relaxed">
@@ -366,57 +396,42 @@ export default function ResearchGraph() {
             )}
 
             {/* External links */}
-            {selectedNode.externalLinks && selectedNode.externalLinks.length > 0 && (
-              <div className="space-y-1.5 mb-4">
-                {selectedNode.externalLinks.map((link, i) => (
-                  <a
-                    key={i}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-xs text-neutral-400 hover:text-white transition-colors group"
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 12 12"
-                      fill="none"
-                      className="flex-shrink-0 opacity-50 group-hover:opacity-100"
+            {selectedNode.externalLinks &&
+              selectedNode.externalLinks.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-white/5">
+                  {selectedNode.externalLinks.map((link, i) => (
+                    <a
+                      key={i}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-xs text-neutral-400 hover:text-white transition-colors group py-1"
                     >
-                      <path
-                        d="M2.07102 11.3494L0.963068 10.2415L9.2017 1.98864H2.83807L2.85227 0.454545H11.8438V9.46023H10.2955L10.3097 3.09659L2.07102 11.3494Z"
-                        fill="currentColor"
-                      />
-                    </svg>
-                    {link.label}
-                  </a>
-                ))}
-              </div>
-            )}
-
-            {/* Primary URL */}
-            {selectedNode.url && (
-              <a
-                href={selectedNode.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-colors"
-                style={{
-                  backgroundColor: TYPE_COLORS[selectedNode.type] + "15",
-                  color: TYPE_COLORS[selectedNode.type],
-                }}
-              >
-                Open →
-              </a>
-            )}
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        className="flex-shrink-0 opacity-40 group-hover:opacity-100"
+                      >
+                        <path
+                          d="M2.07102 11.3494L0.963068 10.2415L9.2017 1.98864H2.83807L2.85227 0.454545H11.8438V9.46023H10.2955L10.3097 3.09659L2.07102 11.3494Z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              )}
           </div>
         </div>
       )}
 
-      {/* Hint */}
-      <p className="absolute bottom-4 right-4 z-10 text-[10px] text-neutral-600">
+      {/* Hint — bottom right */}
+      <p className="fixed bottom-4 right-4 z-30 text-[10px] text-neutral-700 hidden md:block">
         drag · scroll to zoom · click to explore
       </p>
-    </div>
+    </>
   );
 }

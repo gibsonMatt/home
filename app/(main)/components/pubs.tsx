@@ -35,7 +35,7 @@ function parseBibs() {
   ];
 
   const fileContents: string = fs
-    .readFileSync("app/publications/pubs.bibtex")
+    .readFileSync("app/(main)/publications/pubs.bibtex")
     .toString();
   const bibs = Object.values(parseString(fileContents)["entries"]) as object[];
 

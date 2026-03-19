@@ -2,10 +2,8 @@ import "./global.css";
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { Navbar } from "./components/nav";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import Footer from "./components/footer";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://home.gibsonmatthew.com"),
@@ -13,10 +11,10 @@ export const metadata: Metadata = {
     default: "Matt Gibson",
     template: "",
   },
-  description: "Matt Gibson — Bioinformatics Engineer",
+  description: "Matt Gibson — Software Engineer",
   openGraph: {
     title: "Matt Gibson",
-    description: "Matt Gibson — Bioinformatics Engineer",
+    description: "Matt Gibson — Software Engineer",
     url: "https://home.gibsonmatthew.com",
     siteName: "Matt Gibson",
     locale: "en_US",
@@ -35,7 +33,8 @@ export const metadata: Metadata = {
   },
 };
 
-const cx = (...classes) => classes.filter(Boolean).join(" ");
+const cx = (...classes: (string | undefined)[]) =>
+  classes.filter(Boolean).join(" ");
 
 export default function RootLayout({
   children,
@@ -45,20 +44,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cx(
-        "text-black bg-white dark:text-white dark:bg-[#111]",
-        GeistSans.variable,
-        GeistMono.variable,
-      )}
+      className={cx(GeistSans.variable, GeistMono.variable)}
     >
-      <body className="antialiased max-w-2xl mx-auto px-6 mt-12 mb-12">
-        <main className="flex-auto min-w-0 flex flex-col">
-          <Navbar />
-          {children}
-          <Footer />
-          <Analytics />
-          <SpeedInsights />
-        </main>
+      <body className="antialiased">
+        {children}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
