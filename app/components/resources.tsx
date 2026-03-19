@@ -1,22 +1,21 @@
-import Link from "next/link";
 import { resource_data } from "app/resources/resource_data";
 
 export function Resources() {
   return (
-    <div>
-      <ul className="list-disc">
-        {resource_data.map((item) => {
-          return (
-            <div className="flex-row  pb-2 md:pl-3 sm:pl-3 pl-3 lg:pl-0">
-              <a href={item.link}>
-                <li className="text-neutral-900 dark:text-neutral-100 tracking-tight hover:text-sky-400">
-                  {item.name}
-                </li>
-              </a>
-            </div>
-          );
-        })}
-      </ul>
+    <div className="grid grid-cols-1 gap-2">
+      {resource_data.map((item) => {
+        return (
+          <a
+            key={item.name}
+            href={item.link}
+            className="group block py-2.5 px-4 -mx-4 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-900/50 transition-colors"
+          >
+            <span className="text-neutral-900 dark:text-neutral-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+              {item.name}
+            </span>
+          </a>
+        );
+      })}
     </div>
   );
 }

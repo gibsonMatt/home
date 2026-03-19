@@ -1,16 +1,14 @@
 import { PortfolioItems } from "app/components/portfolio";
 
 export const metadata = {
-  title: "Matt | Portfolio",
+  title: "Matt Gibson | Portfolio",
   description: "Portfolio",
 };
 
 export default function Page() {
   return (
     <section>
-      <h1 className="font-semibold text-2xl mb-8 tracking-tighter">
-        Portfolio
-      </h1>
+      <h1 className="text-3xl font-semibold tracking-tight mb-8">Portfolio</h1>
       <PortfolioItems />
     </section>
   );

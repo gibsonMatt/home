@@ -17,34 +17,36 @@ function ArrowIcon() {
 
 export default function Footer() {
   return (
-    <footer className="mb-16">
-      <ul className="font-sm mt-8 flex flex-col space-x-0 space-y-2 text-neutral-600 md:flex-row md:space-x-4 md:space-y-0 dark:text-neutral-300">
-        <li>
-          <a
-            className="flex items-center transition-all hover:text-neutral-800 dark:hover:text-neutral-100"
-            rel="noopener noreferrer"
-            target="_blank"
-            href="https://github.com/gibsonmatt"
-          >
-            <ArrowIcon />
-            <p className="ml-2 h-7">github</p>
-          </a>
-        </li>
-        <li>
-          <a
-            className="flex items-center transition-all hover:text-neutral-800 dark:hover:text-neutral-100"
-            rel="noopener noreferrer"
-            target="_blank"
-            href="https://github.com/gibsonMatt/home"
-          >
-            <ArrowIcon />
-            <p className="ml-2 h-7">view source</p>
-          </a>
-        </li>
-      </ul>
-      <p className="mt-8 text-neutral-600 dark:text-neutral-300">
-        © {new Date().getFullYear()} MIT Licensed
-      </p>
+    <footer className="mt-20 pt-8 border-t border-neutral-200 dark:border-neutral-800 mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <ul className="flex flex-row gap-5 text-sm text-neutral-500 dark:text-neutral-400">
+          <li>
+            <a
+              className="flex items-center gap-1.5 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+              rel="noopener noreferrer"
+              target="_blank"
+              href="https://github.com/gibsonmatt"
+            >
+              <ArrowIcon />
+              github
+            </a>
+          </li>
+          <li>
+            <a
+              className="flex items-center gap-1.5 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+              rel="noopener noreferrer"
+              target="_blank"
+              href="https://github.com/gibsonMatt/home"
+            >
+              <ArrowIcon />
+              source
+            </a>
+          </li>
+        </ul>
+        <p className="text-sm text-neutral-400 dark:text-neutral-500">
+          © {new Date().getFullYear()} MIT Licensed
+        </p>
+      </div>
     </footer>
   );
 }

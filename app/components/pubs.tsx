@@ -1,6 +1,3 @@
-import Link from "next/link";
-import { NewsStory, news_items } from "app/news/news_data";
-
 import fs from "fs";
 import { parseString } from "bibliography";
 
@@ -57,25 +54,44 @@ export async function Publications() {
   const bibs: Entry[] = parseBibs();
 
   return (
-    <section className="text-neutral-900 dark:text-neutral-100 tracking-tight">
-      {bibs.map((entry) => {
+    <section className="space-y-5">
+      {bibs.map((entry, i) => {
+        const content = (
+          <>
+            <span className="text-neutral-600 dark:text-neutral-400">
+              {entry.author}
+            </span>
+            .{" "}
+            <span className="font-semibold text-neutral-900 dark:text-neutral-100">
+              {entry.year}
+            </span>
+            . {entry.title}.{" "}
+            <span className="italic text-neutral-500 dark:text-neutral-400">
+              {entry.journal}
+            </span>
+          </>
+        );
+
+        if (entry.url) {
+          return (
+            <a
+              key={i}
+              href={entry.url}
+              className="block py-2 px-3 -mx-3 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-900/50 transition-colors text-sm leading-relaxed group"
+            >
+              <span className="group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                {content}
+              </span>
+            </a>
+          );
+        }
+
         return (
-          <div>
-            {!entry.url && (
-              <div className="pb-4 hover:text-sky-400">
-                {entry.author}. <span className="font-bold">{entry.year}</span>.{" "}
-                {entry.title}. <span className="italic">{entry.journal}</span>
-              </div>
-            )}
-            {entry.url && (
-              <div className="pb-4 hover:text-blue-600">
-                <a href={entry.url}>
-                  {entry.author}.{" "}
-                  <span className="font-bold">{entry.year}</span>. {entry.title}
-                  . <span className="italic">{entry.journal}</span>
-                </a>
-              </div>
-            )}
+          <div
+            key={i}
+            className="py-2 px-3 -mx-3 text-sm leading-relaxed"
+          >
+            {content}
           </div>
         );
       })}

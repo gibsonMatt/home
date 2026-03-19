@@ -1,14 +1,14 @@
 import { Publications } from "app/components/pubs";
 
 export const metadata = {
-  title: "Matt | Publications",
+  title: "Matt Gibson | Publications",
   description: "Publications",
 };
 
 export default function Page() {
   return (
     <section>
-      <h1 className="font-semibold text-2xl mb-8 tracking-tighter">
+      <h1 className="text-3xl font-semibold tracking-tight mb-8">
         Publications
       </h1>
       <Publications />
