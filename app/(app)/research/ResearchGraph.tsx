@@ -9,7 +9,8 @@ import {
   NodeType,
 } from "./research_data";
 
-const TYPE_COLORS: Record<NodeType, string> = {
+// ─── Default colors (can be overridden via /config) ───
+const DEFAULT_COLORS: Record<NodeType, string> = {
   paper: "#3b82f6",
   organism: "#22c55e",
   method: "#a855f7",
@@ -35,10 +36,39 @@ interface SimLink extends d3.SimulationLinkDatum<SimNode> {
   strength?: number;
 }
 
+interface Config {
+  colors: Record<NodeType, string>;
+  chargeStrength: number;
+  linkDistance: number;
+  centerStrength: number;
+  edgeOpacity: number;
+  nodeOpacity: number;
+  labelSize: number;
+  glowEnabled: boolean;
+}
+
+const DEFAULT_CONFIG: Config = {
+  colors: { ...DEFAULT_COLORS },
+  chargeStrength: -250,
+  linkDistance: 90,
+  centerStrength: 0.15,
+  edgeOpacity: 0.06,
+  nodeOpacity: 0.8,
+  labelSize: 1,
+  glowEnabled: false,
+};
+
 export default function ResearchGraph() {
   const svgRef = useRef<SVGSVGElement>(null);
+  const cmdRef = useRef<HTMLInputElement>(null);
   const [selectedNode, setSelectedNode] = useState<ResearchNode | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [config, setConfig] = useState<Config>({ ...DEFAULT_CONFIG });
+  const [showCmd, setShowCmd] = useState(false);
+  const [cmdValue, setCmdValue] = useState("");
+  const [cmdHistory, setCmdHistory] = useState<string[]>([]);
+  const [showConfig, setShowConfig] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [activeTypes, setActiveTypes] = useState<Set<NodeType>>(
     () =>
       new Set<NodeType>([
@@ -61,10 +91,91 @@ export default function ResearchGraph() {
     return () => window.removeEventListener("resize", update);
   }, []);
 
+  // Keyboard shortcut: / to open command
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "/" && !showCmd && !showConfig) {
+        e.preventDefault();
+        setShowCmd(true);
+        setCmdValue("/");
+        setTimeout(() => cmdRef.current?.focus(), 50);
+      }
+      if (e.key === "Escape") {
+        setShowCmd(false);
+        setShowConfig(false);
+        setShowHelp(false);
+        setSelectedNode(null);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [showCmd, showConfig]);
+
+  // Process commands
+  const runCommand = useCallback(
+    (cmd: string) => {
+      const trimmed = cmd.trim().toLowerCase();
+      setCmdHistory((prev) => [...prev.slice(-20), cmd]);
+
+      if (trimmed === "/help" || trimmed === "/?") {
+        setShowHelp(true);
+        setShowCmd(false);
+      } else if (trimmed === "/config") {
+        setShowConfig(true);
+        setShowCmd(false);
+      } else if (trimmed === "/reset") {
+        setConfig({ ...DEFAULT_CONFIG });
+        setShowCmd(false);
+      } else if (trimmed.startsWith("/theme ")) {
+        const theme = trimmed.replace("/theme ", "");
+        if (theme === "mono") {
+          setConfig((c) => ({
+            ...c,
+            colors: Object.fromEntries(
+              Object.keys(c.colors).map((k) => [k, "#888"]),
+            ) as Record<NodeType, string>,
+          }));
+        } else if (theme === "neon") {
+          setConfig((c) => ({
+            ...c,
+            colors: {
+              paper: "#00ffff",
+              organism: "#39ff14",
+              method: "#bf00ff",
+              theme: "#ffff00",
+              collaborator: "#ff1493",
+              tool: "#00ff7f",
+              location: "#ff4500",
+            },
+            glowEnabled: true,
+          }));
+        } else if (theme === "default") {
+          setConfig((c) => ({ ...c, colors: { ...DEFAULT_COLORS }, glowEnabled: false }));
+        }
+        setShowCmd(false);
+      } else if (trimmed.startsWith("/filter ")) {
+        const type = trimmed.replace("/filter ", "") as NodeType;
+        if (type in DEFAULT_COLORS) {
+          toggleType(type);
+        }
+        setShowCmd(false);
+      } else if (trimmed === "/glow") {
+        setConfig((c) => ({ ...c, glowEnabled: !c.glowEnabled }));
+        setShowCmd(false);
+      } else {
+        setShowCmd(false);
+      }
+      setCmdValue("");
+    },
+    [],
+  );
+
+  // D3 graph
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
 
     const { width, height } = dimensions;
+    const colors = config.colors;
 
     const filteredNodeIds = new Set(
       rawNodes.filter((n) => activeTypes.has(n.type)).map((n) => n.id),
@@ -88,33 +199,30 @@ export default function ResearchGraph() {
 
     svg.selectAll("*").remove();
 
-    // Glow filter
-    const defs = svg.append("defs");
-    const filter = defs.append("filter").attr("id", "glow");
-    filter
-      .append("feGaussianBlur")
-      .attr("stdDeviation", "2.5")
-      .attr("result", "coloredBlur");
-    const feMerge = filter.append("feMerge");
-    feMerge.append("feMergeNode").attr("in", "coloredBlur");
-    feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+    // Optional glow
+    if (config.glowEnabled) {
+      const defs = svg.append("defs");
+      const filter = defs.append("filter").attr("id", "glow");
+      filter
+        .append("feGaussianBlur")
+        .attr("stdDeviation", "1.5")
+        .attr("result", "coloredBlur");
+      const feMerge = filter.append("feMerge");
+      feMerge.append("feMergeNode").attr("in", "coloredBlur");
+      feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+    }
 
     const g = svg.append("g");
 
-    // Zoom — works on both desktop and mobile
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.15, 5])
-      .filter((event) => {
-        // Allow all zoom/pan events except double-click
-        return !event.type.startsWith("dblclick");
-      })
+      .filter((event) => !event.type.startsWith("dblclick"))
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
       });
 
     svg.call(zoom);
-    // Start centered
     svg.call(
       zoom.transform,
       d3.zoomIdentity.translate(width * 0.1, height * 0.1).scale(0.8),
@@ -127,11 +235,11 @@ export default function ResearchGraph() {
         d3
           .forceLink<SimNode, SimLink>(linkData)
           .id((d) => d.id)
-          .distance(90)
+          .distance(config.linkDistance)
           .strength((d) => (d.strength || 0.5) * 0.6),
       )
-      .force("charge", d3.forceManyBody().strength(-250).distanceMax(600))
-      .force("center", d3.forceCenter(width / 2, height / 2).strength(0.15))
+      .force("charge", d3.forceManyBody().strength(config.chargeStrength).distanceMax(600))
+      .force("center", d3.forceCenter(width / 2, height / 2).strength(config.centerStrength))
       .force(
         "collision",
         d3.forceCollide().radius((d: any) => (d.size || 6) + 5),
@@ -146,7 +254,7 @@ export default function ResearchGraph() {
       .data(linkData)
       .join("line")
       .attr("stroke", "#ffffff")
-      .attr("stroke-opacity", 0.06)
+      .attr("stroke-opacity", config.edgeOpacity)
       .attr("stroke-width", 0.8);
 
     // Node groups
@@ -175,28 +283,29 @@ export default function ResearchGraph() {
           }),
       );
 
-    // Circles
+    // Circles — no blur filter by default
     nodeGroup
       .append("circle")
       .attr("r", (d) => d.size || 6)
-      .attr("fill", (d) => TYPE_COLORS[d.type])
-      .attr("fill-opacity", 0.8)
-      .attr("stroke", (d) => TYPE_COLORS[d.type])
-      .attr("stroke-width", 2)
-      .attr("stroke-opacity", 0.25)
-      .attr("filter", "url(#glow)");
+      .attr("fill", (d) => colors[d.type])
+      .attr("fill-opacity", config.nodeOpacity)
+      .attr("stroke", (d) => colors[d.type])
+      .attr("stroke-width", 1.5)
+      .attr("stroke-opacity", 0.2)
+      .attr("filter", config.glowEnabled ? "url(#glow)" : null);
 
     // Labels
+    const labelScale = config.labelSize;
     nodeGroup
       .append("text")
       .text((d) => d.label)
-      .attr("font-size", (d) => Math.max(8, (d.size || 6) * 0.6))
-      .attr("fill", "#777")
+      .attr("font-size", (d) => Math.max(8, (d.size || 6) * 0.6) * labelScale)
+      .attr("fill", "#666")
       .attr("text-anchor", "middle")
-      .attr("dy", (d) => (d.size || 6) + 13)
+      .attr("dy", (d) => (d.size || 6) + 12)
       .attr("pointer-events", "none")
       .style("user-select", "none")
-      .style("font-family", "var(--font-geist-sans), system-ui, sans-serif");
+      .style("font-family", "'Geist Mono', 'SF Mono', 'Fira Code', monospace");
 
     // Hover
     nodeGroup
@@ -218,34 +327,32 @@ export default function ResearchGraph() {
         nodeGroup
           .select("circle")
           .attr("fill-opacity", (n: any) =>
-            connected.has(n.id) ? 1 : 0.1,
+            connected.has(n.id) ? 1 : 0.08,
           );
         nodeGroup
           .select("text")
           .attr("fill-opacity", (n: any) =>
-            connected.has(n.id) ? 1 : 0.1,
+            connected.has(n.id) ? 1 : 0.08,
           );
         link.attr("stroke-opacity", (l: any) => {
           const sid =
             typeof l.source === "object" ? l.source.id : l.source;
           const tid =
             typeof l.target === "object" ? l.target.id : l.target;
-          return sid === d.id || tid === d.id ? 0.4 : 0.015;
+          return sid === d.id || tid === d.id ? 0.4 : 0.01;
         });
       })
       .on("mouseleave", () => {
-        nodeGroup.select("circle").attr("fill-opacity", 0.8);
+        nodeGroup.select("circle").attr("fill-opacity", config.nodeOpacity);
         nodeGroup.select("text").attr("fill-opacity", 1);
-        link.attr("stroke-opacity", 0.06);
+        link.attr("stroke-opacity", config.edgeOpacity);
       });
 
-    // Click to select (works on touch too)
     nodeGroup.on("click", (_event, d) => {
       _event.stopPropagation();
       setSelectedNode(d);
     });
 
-    // Click background to deselect
     svg.on("click", () => {
       setSelectedNode(null);
     });
@@ -263,7 +370,7 @@ export default function ResearchGraph() {
     return () => {
       simulation.stop();
     };
-  }, [activeTypes, dimensions]);
+  }, [activeTypes, dimensions, config]);
 
   const toggleType = (type: NodeType) => {
     setActiveTypes((prev) => {
@@ -276,7 +383,7 @@ export default function ResearchGraph() {
 
   return (
     <>
-      {/* SVG fills entire screen */}
+      {/* SVG */}
       <svg
         ref={svgRef}
         className="fixed inset-0 w-screen h-screen"
@@ -284,154 +391,319 @@ export default function ResearchGraph() {
       />
 
       {/* Filter pills — bottom left */}
-      <div className="fixed bottom-4 left-4 z-40 flex flex-wrap gap-1.5 max-w-[calc(100vw-2rem)]">
-        {(Object.keys(TYPE_COLORS) as NodeType[]).map((type) => (
+      <div className="fixed bottom-10 left-4 z-40 flex flex-wrap gap-1.5 max-w-[calc(100vw-2rem)]">
+        {(Object.keys(config.colors) as NodeType[]).map((type) => (
           <button
             key={type}
             onClick={() => toggleType(type)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all backdrop-blur-sm"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] transition-all"
             style={{
+              fontFamily: "'Geist Mono', 'SF Mono', monospace",
               backgroundColor: activeTypes.has(type)
-                ? TYPE_COLORS[type] + "18"
-                : "rgba(255,255,255,0.03)",
-              color: activeTypes.has(type) ? TYPE_COLORS[type] : "#555",
-              border: `1px solid ${activeTypes.has(type) ? TYPE_COLORS[type] + "30" : "#222"}`,
+                ? config.colors[type] + "15"
+                : "rgba(255,255,255,0.02)",
+              color: activeTypes.has(type) ? config.colors[type] : "#444",
+              border: `1px solid ${activeTypes.has(type) ? config.colors[type] + "25" : "#1a1a1a"}`,
             }}
           >
             <span
               className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: TYPE_COLORS[type] }}
+              style={{ backgroundColor: config.colors[type] }}
             />
             {TYPE_LABELS[type]}
           </button>
         ))}
       </div>
 
+      {/* Command bar */}
+      {showCmd && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-96 max-w-[90vw]">
+          <input
+            ref={cmdRef}
+            type="text"
+            value={cmdValue}
+            onChange={(e) => setCmdValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") runCommand(cmdValue);
+              if (e.key === "Escape") setShowCmd(false);
+            }}
+            placeholder="type a command..."
+            className="w-full px-4 py-2 rounded-md bg-black/90 border border-white/10 text-sm text-green-400 placeholder-neutral-600 outline-none backdrop-blur-xl"
+            style={{ fontFamily: "'Geist Mono', 'SF Mono', monospace" }}
+            autoFocus
+          />
+        </div>
+      )}
+
+      {/* Help overlay */}
+      {showHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowHelp(false)}>
+          <div
+            className="bg-[#111] border border-white/10 rounded-lg p-6 max-w-md w-full mx-4"
+            style={{ fontFamily: "'Geist Mono', 'SF Mono', monospace" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-green-400 text-sm mb-4">$ help</h2>
+            <div className="space-y-2 text-xs text-neutral-400">
+              <p><span className="text-green-400">/help</span> — show this</p>
+              <p><span className="text-green-400">/config</span> — open config panel</p>
+              <p><span className="text-green-400">/theme default</span> — default colors</p>
+              <p><span className="text-green-400">/theme mono</span> — monochrome</p>
+              <p><span className="text-green-400">/theme neon</span> — neon glow</p>
+              <p><span className="text-green-400">/glow</span> — toggle glow effect</p>
+              <p><span className="text-green-400">/filter [type]</span> — toggle node type</p>
+              <p><span className="text-green-400">/reset</span> — reset all settings</p>
+              <p className="pt-2 text-neutral-600">press / to open command bar · esc to close</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Config panel */}
+      {showConfig && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowConfig(false)}>
+          <div
+            className="bg-[#111] border border-white/10 rounded-lg p-6 max-w-md w-full mx-4"
+            style={{ fontFamily: "'Geist Mono', 'SF Mono', monospace" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-green-400 text-sm mb-4">$ config</h2>
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="text-neutral-500 block mb-1">charge_strength: {config.chargeStrength}</label>
+                <input
+                  type="range"
+                  min="-600"
+                  max="-50"
+                  value={config.chargeStrength}
+                  onChange={(e) =>
+                    setConfig((c) => ({ ...c, chargeStrength: parseInt(e.target.value) }))
+                  }
+                  className="w-full accent-green-500"
+                />
+              </div>
+              <div>
+                <label className="text-neutral-500 block mb-1">link_distance: {config.linkDistance}</label>
+                <input
+                  type="range"
+                  min="30"
+                  max="200"
+                  value={config.linkDistance}
+                  onChange={(e) =>
+                    setConfig((c) => ({ ...c, linkDistance: parseInt(e.target.value) }))
+                  }
+                  className="w-full accent-green-500"
+                />
+              </div>
+              <div>
+                <label className="text-neutral-500 block mb-1">center_strength: {config.centerStrength.toFixed(2)}</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="50"
+                  value={config.centerStrength * 100}
+                  onChange={(e) =>
+                    setConfig((c) => ({
+                      ...c,
+                      centerStrength: parseInt(e.target.value) / 100,
+                    }))
+                  }
+                  className="w-full accent-green-500"
+                />
+              </div>
+              <div>
+                <label className="text-neutral-500 block mb-1">edge_opacity: {config.edgeOpacity.toFixed(2)}</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="50"
+                  value={config.edgeOpacity * 100}
+                  onChange={(e) =>
+                    setConfig((c) => ({
+                      ...c,
+                      edgeOpacity: parseInt(e.target.value) / 100,
+                    }))
+                  }
+                  className="w-full accent-green-500"
+                />
+              </div>
+              <div>
+                <label className="text-neutral-500 block mb-1">node_opacity: {config.nodeOpacity.toFixed(2)}</label>
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  value={config.nodeOpacity * 100}
+                  onChange={(e) =>
+                    setConfig((c) => ({
+                      ...c,
+                      nodeOpacity: parseInt(e.target.value) / 100,
+                    }))
+                  }
+                  className="w-full accent-green-500"
+                />
+              </div>
+              <div>
+                <label className="text-neutral-500 block mb-1">label_size: {config.labelSize.toFixed(1)}</label>
+                <input
+                  type="range"
+                  min="5"
+                  max="20"
+                  value={config.labelSize * 10}
+                  onChange={(e) =>
+                    setConfig((c) => ({
+                      ...c,
+                      labelSize: parseInt(e.target.value) / 10,
+                    }))
+                  }
+                  className="w-full accent-green-500"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-neutral-500">glow:</label>
+                <button
+                  onClick={() => setConfig((c) => ({ ...c, glowEnabled: !c.glowEnabled }))}
+                  className={`px-2 py-0.5 rounded text-[10px] border ${
+                    config.glowEnabled
+                      ? "border-green-500/30 text-green-400 bg-green-500/10"
+                      : "border-white/10 text-neutral-600"
+                  }`}
+                >
+                  {config.glowEnabled ? "on" : "off"}
+                </button>
+              </div>
+              <div className="pt-2 flex gap-2">
+                <button
+                  onClick={() => {
+                    setConfig({ ...DEFAULT_CONFIG });
+                  }}
+                  className="px-3 py-1 rounded text-[10px] border border-white/10 text-neutral-500 hover:text-white transition-colors"
+                >
+                  reset
+                </button>
+                <button
+                  onClick={() => setShowConfig(false)}
+                  className="px-3 py-1 rounded text-[10px] border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-colors"
+                >
+                  close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Detail panel */}
       {selectedNode && (
-        <div
-          className="fixed top-0 right-0 z-50 w-80 max-w-[85vw] h-screen overflow-y-auto bg-black/90 backdrop-blur-xl border-l border-white/10 shadow-2xl"
-        >
-          <div className="p-5 pt-6">
-            {/* Close */}
+        <div className="fixed top-0 right-0 z-50 w-80 max-w-[85vw] h-screen overflow-y-auto bg-[#0d0d0d]/95 backdrop-blur-xl border-l border-white/5">
+          <div className="p-5 pt-6" style={{ fontFamily: "'Geist Mono', 'SF Mono', monospace" }}>
             <button
               onClick={() => setSelectedNode(null)}
-              className="absolute top-4 right-4 text-neutral-500 hover:text-white transition-colors p-1"
+              className="absolute top-4 right-4 text-neutral-600 hover:text-white transition-colors p-1"
             >
-              <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M12 4L4 12M4 4L12 12"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </button>
 
-            {/* Type badge */}
             <div className="flex items-center gap-2 mb-3">
               <span
-                className="w-3 h-3 rounded-full flex-shrink-0"
-                style={{ backgroundColor: TYPE_COLORS[selectedNode.type] }}
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: config.colors[selectedNode.type] }}
               />
               <span
-                className="text-[10px] font-semibold uppercase tracking-widest"
-                style={{ color: TYPE_COLORS[selectedNode.type] }}
+                className="text-[10px] font-medium uppercase tracking-widest"
+                style={{ color: config.colors[selectedNode.type] }}
               >
                 {selectedNode.type}
               </span>
               {selectedNode.year && (
-                <span className="text-[10px] text-neutral-500 ml-auto">
+                <span className="text-[10px] text-neutral-600 ml-auto">
                   {selectedNode.year}
                 </span>
               )}
             </div>
 
-            {/* Image */}
             {selectedNode.image && (
-              <div className="mb-4 rounded-lg overflow-hidden">
+              <div className="mb-4 rounded overflow-hidden border border-white/5">
                 <img
                   src={selectedNode.image}
                   alt={selectedNode.label}
-                  className="w-full h-40 object-cover"
+                  className="w-full h-36 object-cover"
                   loading="lazy"
                 />
                 {selectedNode.imageCredit && (
-                  <p className="text-[9px] text-neutral-600 mt-1">
+                  <p className="text-[8px] text-neutral-700 mt-1 px-0.5">
                     {selectedNode.imageCredit}
                   </p>
                 )}
               </div>
             )}
 
-            {/* Title */}
-            <h2 className="text-lg font-semibold text-white leading-snug mb-2">
+            <h2 className="text-sm font-medium text-white leading-snug mb-1.5">
               {selectedNode.label}
             </h2>
 
-            {/* Taxonomy */}
             {selectedNode.taxonomy && (
-              <p className="text-xs text-neutral-500 italic mb-3">
+              <p className="text-[10px] text-neutral-600 mb-3">
                 {selectedNode.taxonomy}
               </p>
             )}
 
-            {/* Description */}
             {selectedNode.detail && (
-              <p className="text-sm text-neutral-400 leading-relaxed mb-4">
+              <p className="text-xs text-neutral-500 leading-relaxed mb-4">
                 {selectedNode.detail}
               </p>
             )}
 
-            {/* Abstract */}
             {selectedNode.abstract && (
               <div className="mb-4">
-                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-neutral-600 mb-1.5">
-                  Abstract
-                </h3>
-                <p className="text-xs text-neutral-500 leading-relaxed">
+                <p className="text-[9px] text-neutral-700 uppercase tracking-wider mb-1">
+                  abstract
+                </p>
+                <p className="text-[11px] text-neutral-600 leading-relaxed">
                   {selectedNode.abstract}
                 </p>
               </div>
             )}
 
-            {/* External links */}
-            {selectedNode.externalLinks &&
-              selectedNode.externalLinks.length > 0 && (
-                <div className="space-y-2 pt-2 border-t border-white/5">
-                  {selectedNode.externalLinks.map((link, i) => (
-                    <a
-                      key={i}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-xs text-neutral-400 hover:text-white transition-colors group py-1"
-                    >
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                        className="flex-shrink-0 opacity-40 group-hover:opacity-100"
-                      >
-                        <path
-                          d="M2.07102 11.3494L0.963068 10.2415L9.2017 1.98864H2.83807L2.85227 0.454545H11.8438V9.46023H10.2955L10.3097 3.09659L2.07102 11.3494Z"
-                          fill="currentColor"
-                        />
-                      </svg>
-                      {link.label}
-                    </a>
-                  ))}
-                </div>
-              )}
+            {selectedNode.externalLinks && selectedNode.externalLinks.length > 0 && (
+              <div className="space-y-1.5 pt-3 border-t border-white/5">
+                {selectedNode.externalLinks.map((link, i) => (
+                  <a
+                    key={i}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-[11px] text-neutral-500 hover:text-green-400 transition-colors py-0.5"
+                  >
+                    <span className="text-neutral-700">→</span>
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Hint — bottom right */}
-      <p className="fixed bottom-4 right-4 z-30 text-[10px] text-neutral-700 hidden md:block">
-        drag · scroll to zoom · click to explore
-      </p>
+      {/* Git hash — bottom right */}
+      <div
+        className="fixed bottom-2 right-4 z-30 text-[9px] text-neutral-700 hidden md:flex items-center gap-3"
+        style={{ fontFamily: "'Geist Mono', 'SF Mono', monospace" }}
+      >
+        <span className="text-neutral-800">
+          press <span className="text-neutral-600">/</span> for commands
+        </span>
+        <a
+          href={`https://github.com/gibsonMatt/home/commit/${process.env.NEXT_PUBLIC_GIT_SHA || "dev"}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-neutral-700 hover:text-neutral-500 transition-colors"
+        >
+          {process.env.NEXT_PUBLIC_GIT_SHA?.slice(0, 7) || "dev"}
+        </a>
+      </div>
     </>
   );
 }
