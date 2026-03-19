@@ -33,14 +33,9 @@ export default function Page() {
               .
             </p>
             <p>
-              I build cloud infrastructure and computational pipelines at the
-              intersection of biology and engineering. My work spans AWS
-              platform architecture, distributed systems, and statistical
-              genetics — from low-pass sequencing pipelines to enterprise data
-              warehouses.
-            </p>
-            <p>
-              I've published on population genomics, phylogenetics, molecular
+              My interests span evolution, population genetics, and building
+              computational tools for complex biological problems. I've
+              published on population genomics, phylogenetics, molecular
               evolution, imputation, and the genetics of invasive species.
             </p>
           </div>
