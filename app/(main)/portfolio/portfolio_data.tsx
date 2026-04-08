@@ -6,6 +6,12 @@ type PortfolioItem = {
 
 export const portfolio_data: PortfolioItem[] = [
   {
+    name: "Research Universe",
+    link: "/research",
+    description:
+      "Interactive D3.js visualization mapping my publications, organisms, methods, collaborators, and research themes",
+  },
+  {
     name: "Portfolio website",
     link: "https://github.com/gibsonMatt/home",
     description: "My personal website, written in TypeScript with Next.js",

@@ -29,6 +29,8 @@ yarn-error.log*
 
 # env files
 .env
+.env.local
+.env.local.*
 
 # vercel
 .vercel
@@ -36,3 +38,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.openclaw/
+AGENTS.md
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+TOOLS.md
+USER.md
+MEMORY.md
+BOOTSTRAP.md
+scripts/

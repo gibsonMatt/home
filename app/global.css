@@ -26,11 +26,13 @@
   }
   html {
     color-scheme: dark;
+    background-color: black;
   }
 }
 
 html {
   min-width: 360px;
+  background-color: white;
 }
 
 .prose .anchor {
