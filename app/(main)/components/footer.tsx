@@ -42,6 +42,17 @@ export default function Footer() {
               source
             </a>
           </li>
+          <li>
+            <a
+              className="flex items-center gap-1.5 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+              rel="noopener noreferrer"
+              target="_blank"
+              href="https://www.linkedin.com/in/matthew-gibson-48548197/"
+            >
+              <ArrowIcon />
+              linkedin
+            </a>
+          </li>
         </ul>
         <p className="text-sm text-neutral-400 dark:text-neutral-500">
           © {new Date().getFullYear()} MIT Licensed
